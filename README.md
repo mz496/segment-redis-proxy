@@ -22,9 +22,13 @@ Prerequisites: A Redis Docker image installed, and a recent version of docker in
 ## Time breakdown
 
 Understanding requirements: ~30 minutes
+
 Setting up Maven, Redis, and Docker: ~2 hours
+
 Total time on all features of cache: ~2 hours
+
 Total time on unit tests: ~2 hours
+
 Documentation: ~1 hour
 
 ## Unimplemented requirements
