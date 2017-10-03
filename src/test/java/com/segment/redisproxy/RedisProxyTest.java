@@ -138,8 +138,8 @@ public class RedisProxyTest {
     }
 
     @Test
-    public void testInsertIntoStaleCache() {
-        System.out.println("Running testInsertIntoStaleCache");
+    public void testDifferentTimeouts() throws InterruptedException {
+        System.out.println("Running testDifferentTimeouts");
 
         RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 4, 100);
 
@@ -148,23 +148,37 @@ public class RedisProxyTest {
         proxy.set("c","3");
         proxy.set("d","4");
         assertEquals(proxy.cacheSize(), 4);
-        Thread.sleep(200);
+        // Cache should contain a,b,c,d (all 0 ms old)
+
+        Thread.sleep(70);
+        proxy.set("a","5");
+        proxy.set("b","6");
+        assertEquals(proxy.cacheSize(), 4);
+        // Cache should contain a,b (0 ms old), c,d (70 ms old)
+
+        Thread.sleep(70);
         proxy.set("e","5");
-        assertFalse(proxy.containsValidEntry("a"));
-        assertFalse(proxy.containsValidEntry("b"));
+        proxy.set("f","6");
+        assertEquals(proxy.cacheSize(), 4);
+        // Cache should contain a,b (70 ms old), e,f (0 ms old) [c,d expired (140 ms old)]
+
+        assertTrue(proxy.containsValidEntry("a"));
+        assertTrue(proxy.containsValidEntry("b"));
         assertFalse(proxy.containsValidEntry("c"));
         assertFalse(proxy.containsValidEntry("d"));
-        assertEquals(proxy.cacheSize(), 1);
+        assertTrue(proxy.containsValidEntry("e"));
+        assertTrue(proxy.containsValidEntry("f"));
+        assertEquals(proxy.cacheSize(), 4);
         proxy.flushDB();
     }
 
     @Test
     public void testConcurrentClients() {
-        System.out.println("Running testInsertIntoStaleCache");
+        // System.out.println("Running testInsertIntoStaleCache");
 
-        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 4, 100);
+        // RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 4, 100);
 
-        
+
     }
     
 

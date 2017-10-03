@@ -7,12 +7,12 @@ class CacheNode {
     public CacheNode next;
     public final String key;
     public String value;
-    public final long arrivalTimeMillis;
+    public long lastUsedTimeMillis;
 
     public CacheNode(String key, String value) {
         this.key = key;
         this.value = value;
-        this.arrivalTimeMillis = System.currentTimeMillis();
+        this.lastUsedTimeMillis = System.currentTimeMillis();
     }
 }
 
@@ -36,6 +36,14 @@ public class RedisProxyCache {
         this.recentlyUsedBack = null;
         this.capacity = capacity;
         this.globalExpiryMillis = globalExpiryMillis;
+    }
+
+    private void printTimes() {
+        System.out.println("-----");
+        for (CacheNode curr = recentlyUsedFront; curr != recentlyUsedBack; curr=curr.next) {
+            System.out.println(curr.lastUsedTimeMillis);
+        }
+        System.out.println("-----");
     }
 
     public void set(String key, String value) {
@@ -129,6 +137,7 @@ public class RedisProxyCache {
 
     private void addToFront(CacheNode node) {
         this.cache.put(node.key, node);
+        node.lastUsedTimeMillis = System.currentTimeMillis();
 
         if (recentlyUsedFront == null && recentlyUsedBack == null) {
             recentlyUsedFront = node;
@@ -164,36 +173,41 @@ public class RedisProxyCache {
     }
 
     private boolean isStale(CacheNode node) {
-        return (System.currentTimeMillis() - node.arrivalTimeMillis) > this.globalExpiryMillis;
+        return (System.currentTimeMillis() - node.lastUsedTimeMillis) > this.globalExpiryMillis;
     }
 
     private void clearStaleEntries() {
+        if (recentlyUsedFront == null && recentlyUsedBack == null) {
+            return;
+        }
+
         if (recentlyUsedFront == recentlyUsedBack && recentlyUsedFront != null) {
             if (isStale(recentlyUsedFront)) {
                 recentlyUsedFront = null;
                 recentlyUsedBack = null;
             }
+            return;
         }
 
-        // Remove stale nodes from the ends
-        while (isStale(recentlyUsedFront)) {
-            removeNode(recentlyUsedFront);
-        }
-        while (isStale(recentlyUsedBack)) {
+        // Remove stale nodes from the back
+        // while (isStale(recentlyUsedFront)) {
+        //     removeNode(recentlyUsedFront);
+        // }
+        while (recentlyUsedBack != null && isStale(recentlyUsedBack)) {
             removeNode(recentlyUsedBack);
         }
         // Remove stale nodes from the middle
-        if (size() > 2) {
-            for (CacheNode curr = recentlyUsedFront.next; curr != recentlyUsedBack.prev; curr = curr.next) {
-                if (isStale(curr)) {
-                    CacheNode oldPrev = curr.prev;
-                    CacheNode oldNext = curr.next;
-                    oldPrev.next = oldNext;
-                    oldNext.prev = oldPrev;
-                    curr = oldNext;
-                }
-            }
-        }
+        // if (size() > 2) {
+        //     for (CacheNode curr = recentlyUsedFront.next; curr != recentlyUsedBack.prev; curr = curr.next) {
+        //         if (isStale(curr)) {
+        //             CacheNode oldPrev = curr.prev;
+        //             CacheNode oldNext = curr.next;
+        //             oldPrev.next = oldNext;
+        //             oldNext.prev = oldPrev;
+        //             curr = oldNext;
+        //         }
+        //     }
+        // }
     }
 
     public int size() {
