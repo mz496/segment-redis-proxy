@@ -28,14 +28,6 @@ public class RedisProxy {
         jedis.connect();
     }
 
-    public String ping() {
-        return jedis.ping();
-    }
-
-    public String flushDB() {
-        return jedis.flushDB();
-    }
-
     public void set(String key, String value) {
         System.out.println("Setting " + key + ", " + value);
         this.cache.set(key,value);
@@ -43,16 +35,37 @@ public class RedisProxy {
     }
 
     public String get(String key) {
+        System.out.println("====== GET " + key);
         String cachedValue = this.cache.get(key);
-        if (cachedValue == null) {
-            System.out.println("Not found in cache");
-            cachedValue = jedis.get(key);
+        if (cachedValue != null) {
+            System.out.println("Value found in cache, moved to front");
+            System.out.println("Got " + cachedValue);
+            return cachedValue;
         }
-        System.out.println("Got " + cachedValue);
-        return cachedValue;
+        else {
+            System.out.println("Value not in cache");
+            String value = jedis.get(key);
+            if (value != null) {
+                System.out.println("Value is in redis but not cache, readding");
+                this.cache.set(key,value);
+            }
+            return value;
+        }
     }
 
     public int cacheSize() {
         return this.cache.size();
+    }
+
+    public boolean containsValidEntry(String key) {
+        return this.cache.containsValidEntry(key);
+    }
+
+    public String ping() {
+        return jedis.ping();
+    }
+
+    public String flushDB() {
+        return jedis.flushDB();
     }
 }

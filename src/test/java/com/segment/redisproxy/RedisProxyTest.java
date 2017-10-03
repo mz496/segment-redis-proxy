@@ -1,6 +1,6 @@
 package com.segment.redisproxy;
 
-import org.junit.Test;
+import org.junit.*;
 import static org.junit.Assert.*;
 import redis.clients.jedis.*;
 import redis.clients.jedis.exceptions.*;
@@ -10,6 +10,7 @@ import java.lang.*;
  * Unit tests for the Redis proxy.
  */
 public class RedisProxyTest {
+
     /**
      * Tests whether the proxy can connect to Redis
      */
@@ -26,25 +27,30 @@ public class RedisProxyTest {
      * Test simple get/set
      */
     @Test
-    public void testHappyCase() {
-        System.out.println("Running testHappyCase");
+    public void testSimpleGetSet() {
+        System.out.println("Running testSimpleGetSet");
 
         RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 10, 10000);
-        assertEquals(proxy.ping(), "PONG");
 
-        assertNull(proxy.get("a"));
-        assertNull(proxy.get("asdf"));
+        assertFalse(proxy.containsValidEntry("asdf"));
         proxy.set("asdf","fdsa");
+        assertTrue(proxy.containsValidEntry("asdf"));
         assertEquals(proxy.get("asdf"), "fdsa");
         proxy.flushDB();
     }
 
-    public void testHappyCaseTimeout() {
+    @Test
+    public void testSimpleTimeout() throws InterruptedException {
+        System.out.println("Running testSimpleTimeout");
 
-    }
+        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 10, 100);
 
-    public void testUpdateKey() {
-
+        assertFalse(proxy.containsValidEntry("a"));
+        proxy.set("a","1");
+        assertEquals(proxy.cacheSize(), 1);
+        Thread.sleep(200);
+        assertFalse(proxy.containsValidEntry("a"));
+        proxy.flushDB();
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -56,7 +62,112 @@ public class RedisProxyTest {
     public void testInvalidExpiry() {
         RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 10, -1);
     }
+
+    @Test
+    public void testUpdateKey() {
+        System.out.println("Running testUpdateKey");
+
+        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 10, 10000);
+
+        assertFalse(proxy.containsValidEntry("a"));
+        proxy.set("a","1");
+        proxy.set("a","2");
+        assertEquals(proxy.cacheSize(), 1);
+        assertEquals(proxy.get("a"), "2");
+        proxy.flushDB();
+    }
+
+    @Test
+    public void testOverflowCache() {
+        System.out.println("Running testOverflowCache");
+
+        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 1, 10000);
+        
+        assertFalse(proxy.containsValidEntry("a"));
+        assertFalse(proxy.containsValidEntry("b"));
+        proxy.set("a","1");
+        assertTrue(proxy.containsValidEntry("a"));
+        assertEquals(proxy.cacheSize(), 1);
+        proxy.set("b","2");
+        assertTrue(proxy.containsValidEntry("b"));
+        assertFalse(proxy.containsValidEntry("a"));
+        assertEquals(proxy.cacheSize(), 1);
+
+        // Cache is full but we can still get items stored earlier
+        assertEquals(proxy.get("a"), "1");
+        assertEquals(proxy.get("b"), "2");
+        proxy.flushDB();
+    }
+
+    @Test
+    public void testEvictionOrder() {
+        System.out.println("Running testEvictionOrder");
+
+        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 4, 10000);
+
+        proxy.set("a","1");
+        proxy.set("b","2");
+        proxy.set("c","3");
+        proxy.set("d","4");
+        proxy.set("e","5");
+        // Cache should contain FRONT e d c b BACK
+        assertTrue(proxy.containsValidEntry("e"));
+        assertTrue(proxy.containsValidEntry("d"));
+        assertTrue(proxy.containsValidEntry("c"));
+        assertTrue(proxy.containsValidEntry("b"));
+        assertFalse(proxy.containsValidEntry("a"));
+        assertEquals(proxy.cacheSize(), 4);
+
+        proxy.get("c");
+        proxy.set("c","10");
+        proxy.get("d");
+        proxy.get("b");
+        // Cache should contain FRONT b d c e BACK
+        proxy.get("a");
+        proxy.set("f","12");
+        // Cache should contain FRONT f a b d BACK
+        assertTrue(proxy.containsValidEntry("f"));
+        assertTrue(proxy.containsValidEntry("a"));
+        assertTrue(proxy.containsValidEntry("b"));
+        assertTrue(proxy.containsValidEntry("d"));
+        assertFalse(proxy.containsValidEntry("e"));
+        assertFalse(proxy.containsValidEntry("c"));
+        assertEquals(proxy.cacheSize(), 4);
+
+        proxy.flushDB();
+    }
+
+    @Test
+    public void testInsertIntoStaleCache() {
+        System.out.println("Running testInsertIntoStaleCache");
+
+        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 4, 100);
+
+        proxy.set("a","1");
+        proxy.set("b","2");
+        proxy.set("c","3");
+        proxy.set("d","4");
+        assertEquals(proxy.cacheSize(), 4);
+        Thread.sleep(200);
+        proxy.set("e","5");
+        assertFalse(proxy.containsValidEntry("a"));
+        assertFalse(proxy.containsValidEntry("b"));
+        assertFalse(proxy.containsValidEntry("c"));
+        assertFalse(proxy.containsValidEntry("d"));
+        assertEquals(proxy.cacheSize(), 1);
+        proxy.flushDB();
+    }
+
+    @Test
+    public void testConcurrentClients() {
+        System.out.println("Running testInsertIntoStaleCache");
+
+        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 4, 100);
+
+        
+    }
     
+
     // Test cache at low capacity
 
     // Test multiple sets of the same key
@@ -73,20 +184,7 @@ public class RedisProxyTest {
 
     // Test concurrent requests
 
-    public void testLowCapacityCache() {
-        System.out.println("Running testLowCapacityCache");
 
-        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 1, 10000);
-        proxy.set("a","1");
-        assertEquals(proxy.get("a"), "1");
-        assertEquals(proxy.cacheSize(), 1);
-        proxy.set("b","2");
-        assertEquals(proxy.get("b"), "2");
-        assertEquals(proxy.cacheSize(), 1);
-        assertEquals(proxy.get("a"), "1");
-        assertEquals(proxy.cacheSize(), 1);
-        proxy.flushDB();
-    }
 
 
 }

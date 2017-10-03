@@ -83,10 +83,10 @@ public class RedisProxyCache {
         }
     }
 
-    // public boolean contains(String key) {
-    //     CacheNode getResult = this.cache.get(key);
-    //     return (getResult != null && !isStale(getResult));
-    // }
+    public boolean containsValidEntry(String key) {
+        CacheNode getResult = this.cache.get(key);
+        return (getResult != null && !isStale(getResult));
+    }
 
     private CacheNode removeNode(CacheNode node) {
         this.cache.remove(node.key);
