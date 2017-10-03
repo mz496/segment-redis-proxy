@@ -35,6 +35,7 @@ public class RedisProxyTest {
 
         assertFalse(proxy.cacheContainsValidEntry("asdf"));
         proxy.set("asdf","fdsa");
+        proxy.get("asdf");
         assertTrue(proxy.cacheContainsValidEntry("asdf"));
         assertEquals(proxy.get("asdf"), "fdsa");
         proxy.flushDB();
@@ -52,8 +53,8 @@ public class RedisProxyTest {
         assertFalse(proxy.cacheContainsValidEntry("a"));
         proxy.set("a","1");
         proxy.set("a","2");
-        assertEquals(proxy.cacheSize(), 1);
         assertEquals(proxy.get("a"), "2");
+        assertEquals(proxy.cacheSize(), 1);
         proxy.flushDB();
     }
 
@@ -68,6 +69,7 @@ public class RedisProxyTest {
 
         assertFalse(proxy.cacheContainsValidEntry("a"));
         proxy.set("a","1");
+        proxy.get("a");
         assertEquals(proxy.cacheSize(), 1);
         Thread.sleep(200);
         assertFalse(proxy.cacheContainsValidEntry("a"));
@@ -85,21 +87,29 @@ public class RedisProxyTest {
         RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 4, 100);
 
         proxy.set("a","1");
+        proxy.get("a");
         proxy.set("b","2");
+        proxy.get("b");
         proxy.set("c","3");
+        proxy.get("c");
         proxy.set("d","4");
+        proxy.get("d");
         assertEquals(proxy.cacheSize(), 4);
         // Cache should contain a,b,c,d (all 0 ms old)
 
         Thread.sleep(70);
         proxy.set("a","5");
+        proxy.get("a");
         proxy.set("b","6");
+        proxy.get("b");
         assertEquals(proxy.cacheSize(), 4);
         // Cache should contain a,b (0 ms old), c,d (70 ms old)
 
         Thread.sleep(70);
         proxy.set("e","5");
+        proxy.get("e");
         proxy.set("f","6");
+        proxy.get("f");
         assertEquals(proxy.cacheSize(), 4);
         // Cache should contain a,b (70 ms old), e,f (0 ms old) [c,d expired (140 ms old)]
 
@@ -142,9 +152,11 @@ public class RedisProxyTest {
         assertFalse(proxy.cacheContainsValidEntry("a"));
         assertFalse(proxy.cacheContainsValidEntry("b"));
         proxy.set("a","1");
+        proxy.get("a");
         assertTrue(proxy.cacheContainsValidEntry("a"));
         assertEquals(proxy.cacheSize(), 1);
         proxy.set("b","2");
+        proxy.get("b");
         assertTrue(proxy.cacheContainsValidEntry("b"));
         assertFalse(proxy.cacheContainsValidEntry("a"));
         assertEquals(proxy.cacheSize(), 1);
@@ -165,10 +177,15 @@ public class RedisProxyTest {
         RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 4, 10000);
 
         proxy.set("a","1");
+        proxy.get("a");
         proxy.set("b","2");
+        proxy.get("b");
         proxy.set("c","3");
+        proxy.get("c");
         proxy.set("d","4");
+        proxy.get("d");
         proxy.set("e","5");
+        proxy.get("e");
         // Cache should contain FRONT e d c b BACK
         assertTrue(proxy.cacheContainsValidEntry("e"));
         assertTrue(proxy.cacheContainsValidEntry("d"));
@@ -184,6 +201,7 @@ public class RedisProxyTest {
         // Cache should contain FRONT b d c e BACK
         proxy.get("a");
         proxy.set("f","12");
+        proxy.get("f");
         // Cache should contain FRONT f a b d BACK
         assertTrue(proxy.cacheContainsValidEntry("f"));
         assertTrue(proxy.cacheContainsValidEntry("a"));

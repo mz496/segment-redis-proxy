@@ -94,7 +94,7 @@ public class RedisProxyCache {
      */
     public String get(String key) {
         CacheNode getResult = this.cache.get(key);
-        System.out.println(this.cache);
+
         if (getResult != null) {
             // If key is in the cache but the entry is stale,
             // pretend it doesn't exist and get rid of it

@@ -29,10 +29,9 @@ public class RedisProxy {
     }
 
     /**
-     * Set the cache's mapping to this key and value
+     * Set the Redis mapping to this key and value, bypassing cache
      */
     public void set(String key, String value) {
-        this.cache.set(key,value);
         jedis.set(key,value);
     }
 
