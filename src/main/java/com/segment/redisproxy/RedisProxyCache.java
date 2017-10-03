@@ -2,6 +2,10 @@ package com.segment.redisproxy;
 
 import java.util.*;
 
+/**
+ * Doubly linked list node that is the value of some key in the cache and
+ * also a node in the doubly linked list keeping track of usage order
+ */
 class CacheNode {
     public CacheNode prev;
     public CacheNode next;
@@ -16,11 +20,31 @@ class CacheNode {
     }
 }
 
+/**
+ * Redis proxy cache, which stores the given capacity of keys that expire after
+ * the given number of milliseconds
+ */
 public class RedisProxyCache {
-    private HashMap<String, CacheNode> cache;
+    /**
+     * The front and back of the recently used list, where the front is the
+     * most recently used and the back is the least recently used
+     */
     private CacheNode recentlyUsedFront;
     private CacheNode recentlyUsedBack;
+
+    /**
+     * The hash map that maps keys to their nodes in the recently used list
+     */
+    private HashMap<String, CacheNode> cache;
+
+    /**
+     * The number of keys the cache can store
+     */
     private int capacity;
+
+    /**
+     * The number of milliseconds after which a key expires
+     */
     private long globalExpiryMillis;
 
     public RedisProxyCache(int capacity, long globalExpiryMillis) throws IllegalArgumentException {
@@ -38,20 +62,14 @@ public class RedisProxyCache {
         this.globalExpiryMillis = globalExpiryMillis;
     }
 
-    private void printTimes() {
-        System.out.println("-----");
-        for (CacheNode curr = recentlyUsedFront; curr != recentlyUsedBack; curr=curr.next) {
-            System.out.println(curr.lastUsedTimeMillis);
-        }
-        System.out.println("-----");
-    }
-
+    /**
+     * Set the cache's mapping to this key and value
+     */
     public void set(String key, String value) {
         CacheNode getResult = this.cache.get(key);
 
         // If already in the cache, just update
         if (getResult != null) {
-            System.out.println("Already found in cache");
             getResult.value = value;
             moveToFront(getResult);
         }
@@ -71,6 +89,9 @@ public class RedisProxyCache {
         }
     }
 
+    /**
+     * Returns the value for the key in the cache
+     */
     public String get(String key) {
         CacheNode getResult = this.cache.get(key);
         System.out.println(this.cache);
@@ -91,11 +112,10 @@ public class RedisProxyCache {
         }
     }
 
-    public boolean containsValidEntry(String key) {
-        CacheNode getResult = this.cache.get(key);
-        return (getResult != null && !isStale(getResult));
-    }
-
+    /**
+     * Helper method that removes the given node from the recently used list
+     * and returns it
+     */
     private CacheNode removeNode(CacheNode node) {
         this.cache.remove(node.key);
 
@@ -121,11 +141,6 @@ public class RedisProxyCache {
             return node;
         }
 
-        // System.out.println(node);
-        // System.out.println(node.prev);
-        // System.out.println(node.next);
-        // System.out.println(recentlyUsedFront);
-        // System.out.println(recentlyUsedBack);
         CacheNode oldPrev = node.prev;
         CacheNode oldNext = node.next;
         oldPrev.next = oldNext;
@@ -135,6 +150,10 @@ public class RedisProxyCache {
         return node;
     }
 
+    /**
+     * Helper method that adds the given node to the front of the recently used list 
+     * and updates its timestamp to now
+     */
     private void addToFront(CacheNode node) {
         this.cache.put(node.key, node);
         node.lastUsedTimeMillis = System.currentTimeMillis();
@@ -152,30 +171,31 @@ public class RedisProxyCache {
         recentlyUsedFront = node;
     }
 
+    /**
+     * Helper method that moves a given node to the front of the recently used list
+     */
     private void moveToFront(CacheNode node) {
         addToFront(removeNode(node));
     }
 
+    /**
+     * Helper method that removes the last (least-recently-used) node of the recently
+     * used list
+     */
     private void evictLRU() {
         removeNode(recentlyUsedBack);
-        // this.cache.remove(recentlyUsedBack.key);
-
-        // if (recentlyUsedBack == null) {
-        //     return;
-        // }
-        // if (recentlyUsedFront == recentlyUsedBack) {
-        //     recentlyUsedFront = null;
-        //     recentlyUsedBack = null;
-        //     return;
-        // }
-        // recentlyUsedBack = recentlyUsedBack.prev;
-        // recentlyUsedBack.next = null;
     }
 
+    /**
+     * Returns true iff the given node is stale (expired)
+     */
     private boolean isStale(CacheNode node) {
         return (System.currentTimeMillis() - node.lastUsedTimeMillis) > this.globalExpiryMillis;
     }
 
+    /**
+     * Removes all stale nodes from the recently used list
+     */
     private void clearStaleEntries() {
         if (recentlyUsedFront == null && recentlyUsedBack == null) {
             return;
@@ -190,26 +210,28 @@ public class RedisProxyCache {
         }
 
         // Remove stale nodes from the back
-        // while (isStale(recentlyUsedFront)) {
-        //     removeNode(recentlyUsedFront);
-        // }
+        // This works because moving to front updates timestamps, so the recently
+        // used linked list is ordered in increasing order of age from front to back
         while (recentlyUsedBack != null && isStale(recentlyUsedBack)) {
             removeNode(recentlyUsedBack);
         }
-        // Remove stale nodes from the middle
-        // if (size() > 2) {
-        //     for (CacheNode curr = recentlyUsedFront.next; curr != recentlyUsedBack.prev; curr = curr.next) {
-        //         if (isStale(curr)) {
-        //             CacheNode oldPrev = curr.prev;
-        //             CacheNode oldNext = curr.next;
-        //             oldPrev.next = oldNext;
-        //             oldNext.prev = oldPrev;
-        //             curr = oldNext;
-        //         }
-        //     }
-        // }
     }
 
+    /**
+     * Returns true iff the cache contains a value that would be returned by
+     * get() for this key.
+     * This may return false for entries that are still in the cache.
+     */
+    public boolean containsValidEntry(String key) {
+        CacheNode getResult = this.cache.get(key);
+        return (getResult != null && !isStale(getResult));
+    }
+
+    /**
+     * Returns the number of elements stored in the cache
+     * Warning: as entries go stale, the value returned loses its meaning.
+     * This is only guaranteed to be up to date until the most recent get/set.
+     */
     public int size() {
         return this.cache.size();
     }

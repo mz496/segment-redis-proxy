@@ -25,7 +25,7 @@ public class RedisProxyTest {
     }
 
     /**
-     * Test simple get/set
+     * Test simple get/set cases
      */
     @Test
     public void testSimpleGetSet() {
@@ -33,44 +33,23 @@ public class RedisProxyTest {
 
         RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 10, 10000);
 
-        assertFalse(proxy.containsValidEntry("asdf"));
+        assertFalse(proxy.cacheContainsValidEntry("asdf"));
         proxy.set("asdf","fdsa");
-        assertTrue(proxy.containsValidEntry("asdf"));
+        assertTrue(proxy.cacheContainsValidEntry("asdf"));
         assertEquals(proxy.get("asdf"), "fdsa");
         proxy.flushDB();
     }
 
-    @Test
-    public void testSimpleTimeout() throws InterruptedException {
-        System.out.println("Running testSimpleTimeout");
-
-        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 10, 100);
-
-        assertFalse(proxy.containsValidEntry("a"));
-        proxy.set("a","1");
-        assertEquals(proxy.cacheSize(), 1);
-        Thread.sleep(200);
-        assertFalse(proxy.containsValidEntry("a"));
-        proxy.flushDB();
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testInvalidCacheSize() {
-        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", -1, 10000);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testInvalidExpiry() {
-        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 10, -1);
-    }
-
+    /**
+     * Test updating a key that is already present in the backing Redis
+     */
     @Test
     public void testUpdateKey() {
         System.out.println("Running testUpdateKey");
 
         RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 10, 10000);
 
-        assertFalse(proxy.containsValidEntry("a"));
+        assertFalse(proxy.cacheContainsValidEntry("a"));
         proxy.set("a","1");
         proxy.set("a","2");
         assertEquals(proxy.cacheSize(), 1);
@@ -78,66 +57,27 @@ public class RedisProxyTest {
         proxy.flushDB();
     }
 
+    /**
+     * Test that state of the alive requests is correct when a request expires
+     */
     @Test
-    public void testOverflowCache() {
-        System.out.println("Running testOverflowCache");
+    public void testSimpleTimeout() throws InterruptedException {
+        System.out.println("Running testSimpleTimeout");
 
-        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 1, 10000);
-        
-        assertFalse(proxy.containsValidEntry("a"));
-        assertFalse(proxy.containsValidEntry("b"));
+        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 10, 100);
+
+        assertFalse(proxy.cacheContainsValidEntry("a"));
         proxy.set("a","1");
-        assertTrue(proxy.containsValidEntry("a"));
         assertEquals(proxy.cacheSize(), 1);
-        proxy.set("b","2");
-        assertTrue(proxy.containsValidEntry("b"));
-        assertFalse(proxy.containsValidEntry("a"));
-        assertEquals(proxy.cacheSize(), 1);
-
-        // Cache is full but we can still get items stored earlier
-        assertEquals(proxy.get("a"), "1");
-        assertEquals(proxy.get("b"), "2");
+        Thread.sleep(200);
+        assertFalse(proxy.cacheContainsValidEntry("a"));
         proxy.flushDB();
     }
 
-    @Test
-    public void testEvictionOrder() {
-        System.out.println("Running testEvictionOrder");
-
-        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 4, 10000);
-
-        proxy.set("a","1");
-        proxy.set("b","2");
-        proxy.set("c","3");
-        proxy.set("d","4");
-        proxy.set("e","5");
-        // Cache should contain FRONT e d c b BACK
-        assertTrue(proxy.containsValidEntry("e"));
-        assertTrue(proxy.containsValidEntry("d"));
-        assertTrue(proxy.containsValidEntry("c"));
-        assertTrue(proxy.containsValidEntry("b"));
-        assertFalse(proxy.containsValidEntry("a"));
-        assertEquals(proxy.cacheSize(), 4);
-
-        proxy.get("c");
-        proxy.set("c","10");
-        proxy.get("d");
-        proxy.get("b");
-        // Cache should contain FRONT b d c e BACK
-        proxy.get("a");
-        proxy.set("f","12");
-        // Cache should contain FRONT f a b d BACK
-        assertTrue(proxy.containsValidEntry("f"));
-        assertTrue(proxy.containsValidEntry("a"));
-        assertTrue(proxy.containsValidEntry("b"));
-        assertTrue(proxy.containsValidEntry("d"));
-        assertFalse(proxy.containsValidEntry("e"));
-        assertFalse(proxy.containsValidEntry("c"));
-        assertEquals(proxy.cacheSize(), 4);
-
-        proxy.flushDB();
-    }
-
+    /**
+     * Test that state of the alive requests is correct when several earlier 
+     * requests expire
+     */
     @Test
     public void testDifferentTimeouts() throws InterruptedException {
         System.out.println("Running testDifferentTimeouts");
@@ -163,24 +103,110 @@ public class RedisProxyTest {
         assertEquals(proxy.cacheSize(), 4);
         // Cache should contain a,b (70 ms old), e,f (0 ms old) [c,d expired (140 ms old)]
 
-        assertTrue(proxy.containsValidEntry("a"));
-        assertTrue(proxy.containsValidEntry("b"));
-        assertFalse(proxy.containsValidEntry("c"));
-        assertFalse(proxy.containsValidEntry("d"));
-        assertTrue(proxy.containsValidEntry("e"));
-        assertTrue(proxy.containsValidEntry("f"));
+        assertTrue(proxy.cacheContainsValidEntry("a"));
+        assertTrue(proxy.cacheContainsValidEntry("b"));
+        assertFalse(proxy.cacheContainsValidEntry("c"));
+        assertFalse(proxy.cacheContainsValidEntry("d"));
+        assertTrue(proxy.cacheContainsValidEntry("e"));
+        assertTrue(proxy.cacheContainsValidEntry("f"));
         assertEquals(proxy.cacheSize(), 4);
         proxy.flushDB();
     }
 
+    /**
+     * Test that an exception is thrown when constructing with an invalid cache size
+     */
+    @Test(expected = IllegalArgumentException.class)
+    public void testInvalidCacheSize() {
+        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", -1, 10000);
+    }
+
+    /**
+     * Test that an exception is thrown when constructing with an invalid expiry
+     */
+    @Test(expected = IllegalArgumentException.class)
+    public void testInvalidExpiry() {
+        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 10, -1);
+    }
+
+    /**
+     * Test that we can still access items in the backing Redis regardless of the
+     * presence in the cache
+     */
+    @Test
+    public void testOverflowCache() {
+        System.out.println("Running testOverflowCache");
+
+        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 1, 10000);
+        
+        assertFalse(proxy.cacheContainsValidEntry("a"));
+        assertFalse(proxy.cacheContainsValidEntry("b"));
+        proxy.set("a","1");
+        assertTrue(proxy.cacheContainsValidEntry("a"));
+        assertEquals(proxy.cacheSize(), 1);
+        proxy.set("b","2");
+        assertTrue(proxy.cacheContainsValidEntry("b"));
+        assertFalse(proxy.cacheContainsValidEntry("a"));
+        assertEquals(proxy.cacheSize(), 1);
+
+        // Cache is full but we can still get items stored earlier
+        assertEquals(proxy.get("a"), "1");
+        assertEquals(proxy.get("b"), "2");
+        proxy.flushDB();
+    }
+
+    /**
+     * Test LRU eviction order
+     */
+    @Test
+    public void testEvictionOrder() {
+        System.out.println("Running testEvictionOrder");
+
+        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 4, 10000);
+
+        proxy.set("a","1");
+        proxy.set("b","2");
+        proxy.set("c","3");
+        proxy.set("d","4");
+        proxy.set("e","5");
+        // Cache should contain FRONT e d c b BACK
+        assertTrue(proxy.cacheContainsValidEntry("e"));
+        assertTrue(proxy.cacheContainsValidEntry("d"));
+        assertTrue(proxy.cacheContainsValidEntry("c"));
+        assertTrue(proxy.cacheContainsValidEntry("b"));
+        assertFalse(proxy.cacheContainsValidEntry("a"));
+        assertEquals(proxy.cacheSize(), 4);
+
+        proxy.get("c");
+        proxy.set("c","10");
+        proxy.get("d");
+        proxy.get("b");
+        // Cache should contain FRONT b d c e BACK
+        proxy.get("a");
+        proxy.set("f","12");
+        // Cache should contain FRONT f a b d BACK
+        assertTrue(proxy.cacheContainsValidEntry("f"));
+        assertTrue(proxy.cacheContainsValidEntry("a"));
+        assertTrue(proxy.cacheContainsValidEntry("b"));
+        assertTrue(proxy.cacheContainsValidEntry("d"));
+        assertFalse(proxy.cacheContainsValidEntry("e"));
+        assertFalse(proxy.cacheContainsValidEntry("c"));
+        assertEquals(proxy.cacheSize(), 4);
+
+        proxy.flushDB();
+    }
+
+    /**
+     * Test that concurrent clients can use the proxy, but their requests will be
+     * handled sequentially
+     */
     @Test
     public void testConcurrentClients() throws InterruptedException {
         System.out.println("Running testConcurrentClients");
 
         RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 4, 100);
 
-        // ExecutorService service = Executors.newSingleThreadExecutor();
-        ExecutorService service = Executors.newFixedThreadPool(1);
+        ExecutorService service = Executors.newSingleThreadExecutor();
         RedisProxyRequest request1 = new RedisProxyRequest(proxy) {
             @Override
             public void run() {
@@ -213,27 +239,5 @@ public class RedisProxyTest {
         assertEquals(proxy.get("b"),"8");
         assertEquals(proxy.get("c"),"9");
         proxy.flushDB();
-
     }
-    
-
-    // Test cache at low capacity
-
-    // Test multiple sets of the same key
-
-    // Test cache of invalid size
-
-    // Test invalid global expiry
-
-    // Test happy case
-
-    // Test expiring entries
-
-    // Test full of expiring entries
-
-    // Test concurrent requests
-
-
-
-
 }
