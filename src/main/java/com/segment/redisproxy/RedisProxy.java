@@ -20,12 +20,14 @@ public class RedisProxy {
 
         this.cache = new RedisProxyCache(cacheCapacity, globalExpiryMillis);
 
-        jedis = new Jedis(backingRedisAddr, backingRedisPort);
+        this.jedis = new Jedis(backingRedisAddr, backingRedisPort);
         try {
             jedis.auth(backingRedisPass);
         }
         catch (JedisDataException e) { }
         jedis.connect();
+
+        
     }
 
     public void set(String key, String value) {

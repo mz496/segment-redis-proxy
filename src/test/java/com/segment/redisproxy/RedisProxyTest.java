@@ -5,6 +5,7 @@ import static org.junit.Assert.*;
 import redis.clients.jedis.*;
 import redis.clients.jedis.exceptions.*;
 import java.lang.*;
+import java.util.concurrent.*;
 
 /**
  * Unit tests for the Redis proxy.
@@ -173,11 +174,45 @@ public class RedisProxyTest {
     }
 
     @Test
-    public void testConcurrentClients() {
-        // System.out.println("Running testInsertIntoStaleCache");
+    public void testConcurrentClients() throws InterruptedException {
+        System.out.println("Running testConcurrentClients");
 
-        // RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 4, 100);
+        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 4, 100);
 
+        // ExecutorService service = Executors.newSingleThreadExecutor();
+        ExecutorService service = Executors.newFixedThreadPool(1);
+        RedisProxyRequest request1 = new RedisProxyRequest(proxy) {
+            @Override
+            public void run() {
+                proxy.set("a","1");
+                proxy.set("b","2");
+                proxy.set("c","3");
+            }
+        };
+        RedisProxyRequest request2 = new RedisProxyRequest(proxy) {
+            @Override
+            public void run() {
+                proxy.set("a","4");
+                proxy.set("b","5");
+                proxy.set("c","6");
+            }
+        };
+        RedisProxyRequest request3 = new RedisProxyRequest(proxy) {
+            @Override
+            public void run() {
+                proxy.set("a","7");
+                proxy.set("b","8");
+                proxy.set("c","9");
+            }
+        };
+        service.execute(request1);
+        service.execute(request2);
+        service.execute(request3);
+        Thread.sleep(1000);
+        assertEquals(proxy.get("a"),"7");
+        assertEquals(proxy.get("b"),"8");
+        assertEquals(proxy.get("c"),"9");
+        proxy.flushDB();
 
     }
     
