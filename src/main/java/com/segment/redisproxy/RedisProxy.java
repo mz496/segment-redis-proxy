@@ -9,8 +9,6 @@ import redis.clients.jedis.exceptions.*;
  */
 public class RedisProxy {
     private final Jedis jedis;
-    private final int cacheCapacity;
-    private final int globalExpiry;
     private final RedisProxyCache cache;
 
     public RedisProxy(
@@ -18,11 +16,9 @@ public class RedisProxy {
         int backingRedisPort,
         String backingRedisPass,
         int cacheCapacity,
-        int globalExpiry) {
+        long globalExpiryMillis) {
 
-        this.cacheCapacity = cacheCapacity;
-        this.globalExpiry = globalExpiry;
-        this.cache = new RedisProxyCache(cacheCapacity);
+        this.cache = new RedisProxyCache(cacheCapacity, globalExpiryMillis);
 
         jedis = new Jedis(backingRedisAddr, backingRedisPort);
         try {
@@ -38,11 +34,21 @@ public class RedisProxy {
 
     public void set(String key, String value) {
         System.out.println("Setting " + key + ", " + value);
+        this.cache.set(key,value);
         jedis.set(key,value);
     }
 
-    public void get(String key) {
-        String value = jedis.get(key);
-        System.out.println("Got " + value);
+    public String get(String key) {
+        String cachedValue = this.cache.get(key);
+        if (cachedValue == null) {
+            System.out.println("Not found in cache");
+            cachedValue = jedis.get(key);
+        }
+        System.out.println("Got " + cachedValue);
+        return cachedValue;
+    }
+
+    public int cacheSize() {
+        return this.cache.size();
     }
 }

@@ -31,9 +31,9 @@ public class RedisProxyTest extends TestCase {
      */
     public void testProxyCanConnect() {
         System.out.println("Running testProxyCanConnect");
-        
+
         RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 0, 0);
-        System.out.println("Proxy can connect to server: " + proxy.ping());
+        assertEquals(proxy.ping(), "PONG");
     }
 
     /**
@@ -42,11 +42,44 @@ public class RedisProxyTest extends TestCase {
     public void testSetGet() {
         System.out.println("Running testSetGet");
 
-        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 0, 0);
+        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 10, 10000);
+        assertEquals(proxy.ping(), "PONG");
 
-        System.out.println("Proxy can connect to server: " + proxy.ping());
+        assertNull(proxy.get("asdf"));
         proxy.set("asdf","fdsa");
-        proxy.get("asdf");
-
+        assertEquals(proxy.get("asdf"), "fdsa");
     }
+
+
+    // Test cache at low capacity
+
+    // Test multiple sets of the same key
+
+    // Test cache of invalid size
+
+    // Test invalid global expiry
+
+    // Test happy case
+
+    // Test expiring entries
+
+    // Test full of expiring entries
+
+    // Test concurrent requests
+
+    public void testLowCapacityCache() {
+        System.out.println("Running testLowCapacityCache");
+
+        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 1, 10000);
+        proxy.set("a","1");
+        assertEquals(proxy.get("a"), "1");
+        assertEquals(proxy.cacheSize(), 1);
+        proxy.set("b","2");
+        assertEquals(proxy.get("b"), "2");
+        assertEquals(proxy.cacheSize(), 1);
+        assertEquals(proxy.get("a"), "1");
+        assertEquals(proxy.cacheSize(), 1);
+    }
+
+
 }
