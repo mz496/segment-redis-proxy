@@ -32,6 +32,10 @@ public class RedisProxy {
         return jedis.ping();
     }
 
+    public String flushDB() {
+        return jedis.flushDB();
+    }
+
     public void set(String key, String value) {
         System.out.println("Setting " + key + ", " + value);
         this.cache.set(key,value);

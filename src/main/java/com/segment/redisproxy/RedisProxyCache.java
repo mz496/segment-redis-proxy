@@ -23,7 +23,14 @@ public class RedisProxyCache {
     private int capacity;
     private long globalExpiryMillis;
 
-    public RedisProxyCache(int capacity, long globalExpiryMillis) {
+    public RedisProxyCache(int capacity, long globalExpiryMillis) throws IllegalArgumentException {
+        if (capacity < 0) {
+            throw new IllegalArgumentException("Cache capacity cannot be negative");
+        }
+        if (globalExpiryMillis < 0) {
+            throw new IllegalArgumentException("Global expiry cannot be negative");
+        }
+
         this.cache = new HashMap<>();
         this.recentlyUsedFront = null;
         this.recentlyUsedBack = null;
@@ -82,6 +89,8 @@ public class RedisProxyCache {
     // }
 
     private CacheNode removeNode(CacheNode node) {
+        this.cache.remove(node.key);
+
         if (node == recentlyUsedFront && node == recentlyUsedBack) {
             recentlyUsedFront = null;
             recentlyUsedBack = null;
@@ -104,11 +113,11 @@ public class RedisProxyCache {
             return node;
         }
 
-        System.out.println(node);
-        System.out.println(node.prev);
-        System.out.println(node.next);
-        System.out.println(recentlyUsedFront);
-        System.out.println(recentlyUsedBack);
+        // System.out.println(node);
+        // System.out.println(node.prev);
+        // System.out.println(node.next);
+        // System.out.println(recentlyUsedFront);
+        // System.out.println(recentlyUsedBack);
         CacheNode oldPrev = node.prev;
         CacheNode oldNext = node.next;
         oldPrev.next = oldNext;
@@ -135,24 +144,23 @@ public class RedisProxyCache {
     }
 
     private void moveToFront(CacheNode node) {
-        this.cache.put(node.key, node);
-
         addToFront(removeNode(node));
     }
 
     private void evictLRU() {
-        this.cache.remove(recentlyUsedBack.key);
+        removeNode(recentlyUsedBack);
+        // this.cache.remove(recentlyUsedBack.key);
 
-        if (recentlyUsedBack == null) {
-            return;
-        }
-        if (recentlyUsedFront == recentlyUsedBack) {
-            recentlyUsedFront = null;
-            recentlyUsedBack = null;
-            return;
-        }
-        recentlyUsedBack = recentlyUsedBack.prev;
-        recentlyUsedBack.next = null;
+        // if (recentlyUsedBack == null) {
+        //     return;
+        // }
+        // if (recentlyUsedFront == recentlyUsedBack) {
+        //     recentlyUsedFront = null;
+        //     recentlyUsedBack = null;
+        //     return;
+        // }
+        // recentlyUsedBack = recentlyUsedBack.prev;
+        // recentlyUsedBack.next = null;
     }
 
     private boolean isStale(CacheNode node) {
@@ -160,17 +168,32 @@ public class RedisProxyCache {
     }
 
     private void clearStaleEntries() {
-        // if (recentlyUsedFront == recentlyUsedBack && recentlyUsedFront != null) {
-        //     if (isStale(recentlyUsedFront)) {
-        //         recentlyUsedFront = null;
-        //         recentlyUsedBack = null;
-        //     }
-        // }
+        if (recentlyUsedFront == recentlyUsedBack && recentlyUsedFront != null) {
+            if (isStale(recentlyUsedFront)) {
+                recentlyUsedFront = null;
+                recentlyUsedBack = null;
+            }
+        }
 
-        // // For 
-        // for (CacheNode curr = recentlyUsedFront.next; curr != null; curr = curr.next) {
-            
-        // }
+        // Remove stale nodes from the ends
+        while (isStale(recentlyUsedFront)) {
+            removeNode(recentlyUsedFront);
+        }
+        while (isStale(recentlyUsedBack)) {
+            removeNode(recentlyUsedBack);
+        }
+        // Remove stale nodes from the middle
+        if (size() > 2) {
+            for (CacheNode curr = recentlyUsedFront.next; curr != recentlyUsedBack.prev; curr = curr.next) {
+                if (isStale(curr)) {
+                    CacheNode oldPrev = curr.prev;
+                    CacheNode oldNext = curr.next;
+                    oldPrev.next = oldNext;
+                    oldNext.prev = oldPrev;
+                    curr = oldNext;
+                }
+            }
+        }
     }
 
     public int size() {

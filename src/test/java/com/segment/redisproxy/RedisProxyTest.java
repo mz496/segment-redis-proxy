@@ -1,56 +1,62 @@
 package com.segment.redisproxy;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import org.junit.Test;
+import static org.junit.Assert.*;
 import redis.clients.jedis.*;
 import redis.clients.jedis.exceptions.*;
+import java.lang.*;
 
 /**
- * Unit test for the Redis proxy.
+ * Unit tests for the Redis proxy.
  */
-public class RedisProxyTest extends TestCase {
-    /**
-     * Create the test case
-     *
-     * @param testName name of the test case
-     */
-    public RedisProxyTest(String testName) {
-        super(testName);
-    }
-
-    /**
-     * @return the suite of tests being tested
-     */
-    public static Test suite() {
-        return new TestSuite(RedisProxyTest.class);
-    }
-
+public class RedisProxyTest {
     /**
      * Tests whether the proxy can connect to Redis
      */
+    @Test
     public void testProxyCanConnect() {
         System.out.println("Running testProxyCanConnect");
 
         RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 0, 0);
         assertEquals(proxy.ping(), "PONG");
+        proxy.flushDB();
     }
 
     /**
-     * 
+     * Test simple get/set
      */
-    public void testSetGet() {
-        System.out.println("Running testSetGet");
+    @Test
+    public void testHappyCase() {
+        System.out.println("Running testHappyCase");
 
         RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 10, 10000);
         assertEquals(proxy.ping(), "PONG");
 
+        assertNull(proxy.get("a"));
         assertNull(proxy.get("asdf"));
         proxy.set("asdf","fdsa");
         assertEquals(proxy.get("asdf"), "fdsa");
+        proxy.flushDB();
     }
 
+    public void testHappyCaseTimeout() {
 
+    }
+
+    public void testUpdateKey() {
+
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testInvalidCacheSize() {
+        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", -1, 10000);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testInvalidExpiry() {
+        RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 10, -1);
+    }
+    
     // Test cache at low capacity
 
     // Test multiple sets of the same key
@@ -79,6 +85,7 @@ public class RedisProxyTest extends TestCase {
         assertEquals(proxy.cacheSize(), 1);
         assertEquals(proxy.get("a"), "1");
         assertEquals(proxy.cacheSize(), 1);
+        proxy.flushDB();
     }
 
 
