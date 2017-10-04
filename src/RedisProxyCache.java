@@ -1,4 +1,4 @@
-package com.segment.redisproxy;
+package src;
 
 import java.util.*;
 

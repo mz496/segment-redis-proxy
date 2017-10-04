@@ -1,4 +1,4 @@
-package com.segment.redisproxy;
+package src;
 
 import redis.clients.jedis.*;
 import redis.clients.jedis.exceptions.*;

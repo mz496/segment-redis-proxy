@@ -1,6 +1,7 @@
-package com.segment.redisproxy;
+package src;
 
 import org.junit.*;
+import org.junit.runner.JUnitCore;
 import static org.junit.Assert.*;
 import redis.clients.jedis.*;
 import redis.clients.jedis.exceptions.*;
@@ -11,6 +12,11 @@ import java.util.concurrent.*;
  * Unit tests for the Redis proxy.
  */
 public class RedisProxyTest {
+
+    // public static void main(String args[]) {
+    //     org.junit.runner.JUnitCore.main("RedisProxyTest.testProxyCanConnect");
+    //     org.junit.runner.JUnitCore.main("RedisProxyTest.testProxyCanConnect");
+    // }
 
     /**
      * Tests whether the proxy can connect to Redis

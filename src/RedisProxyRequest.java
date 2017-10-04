@@ -1,4 +1,4 @@
-package com.segment.redisproxy;
+package src;
 
 /**
  * A request to the Redis proxy. Override the run method with the content
