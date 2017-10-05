@@ -1,23 +1,14 @@
 package src;
 
 import org.junit.*;
-import org.junit.runner.JUnitCore;
 import static org.junit.Assert.*;
 import redis.clients.jedis.*;
 import redis.clients.jedis.exceptions.*;
-import java.lang.*;
-import java.util.concurrent.*;
 
 /**
  * Unit tests for the Redis proxy.
  */
 public class RedisProxyTest {
-
-    // public static void main(String args[]) {
-    //     org.junit.runner.JUnitCore.main("RedisProxyTest.testProxyCanConnect");
-    //     org.junit.runner.JUnitCore.main("RedisProxyTest.testProxyCanConnect");
-    // }
-
     /**
      * Tests whether the proxy can connect to Redis
      */
@@ -230,7 +221,6 @@ public class RedisProxyTest {
 
         RedisProxy proxy = new RedisProxy("localhost", 6379, "foobared", 4, 100);
 
-        ExecutorService service = Executors.newSingleThreadExecutor();
         RedisProxyRequest request1 = new RedisProxyRequest(proxy) {
             @Override
             public void run() {
@@ -255,13 +245,24 @@ public class RedisProxyTest {
                 proxy.set("c","9");
             }
         };
-        service.execute(request1);
-        service.execute(request2);
-        service.execute(request3);
-        Thread.sleep(1000);
+
+        RedisProxyConcurrentRunner runner = new RedisProxyConcurrentRunner();
+        runner.execute(request1);
+        runner.execute(request2);
+        runner.execute(request3);
+        Thread.sleep(500);
         assertEquals(proxy.get("a"),"7");
         assertEquals(proxy.get("b"),"8");
         assertEquals(proxy.get("c"),"9");
+
+        runner.execute(request3);
+        runner.execute(request2);
+        runner.execute(request1);
+        Thread.sleep(500);
+        assertEquals(proxy.get("a"),"1");
+        assertEquals(proxy.get("b"),"2");
+        assertEquals(proxy.get("c"),"3");
+
         proxy.flushDB();
     }
 }
